@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "search": {
+      "command": "python",
+      "args": ["-m", "mcp_servers.search_server"],
+      "description": "Internet search with predefined research/news/fetch prompts",
+      "enabled": true
+    },
+    "file_editor": {
+      "command": "python",
+      "args": ["-m", "mcp_servers.file_editor_server"],
+      "description": "Read/write/edit xlsx, yaml, json, csv files in the workspace",
+      "enabled": true
+    },
+    "finance": {
+      "command": "python",
+      "args": ["-m", "mcp_servers.finance_server"],
+      "description": "Quotes, financial statements, beta, peer multiples, Rf, ERP",
+      "enabled": true
+    },
+    "dcf_builder": {
+      "command": "python",
+      "args": ["-m", "mcp_servers.dcf_builder_server"],
+      "description": "Build a 5-sheet DCF valuation xlsx from a structured spec",
+      "enabled": true
+    }
+  }
+}
