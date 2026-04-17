@@ -22,6 +22,7 @@ class ReActAgent:
         temperature: float = 0.3,
         verbose: bool = True,
         system_prompt_path: str = "",
+        max_history_messages: int = 40,
     ) -> None:
         self.provider = provider
         self.mcp = mcp
@@ -29,6 +30,7 @@ class ReActAgent:
         self.temperature = temperature
         self.verbose = verbose
         self.console = Console()
+        self.max_history_messages = max_history_messages
 
         self.system_prompt = self._load_system_prompt(system_prompt_path)
         self.messages: list[dict[str, Any]] = [
@@ -41,8 +43,16 @@ class ReActAgent:
             return DEFAULT_SYSTEM_PROMPT
         p = Path(path)
         if not p.exists():
+            import warnings
+            warnings.warn(f"system_prompt_path {path!r} not found; using default prompt")
             return DEFAULT_SYSTEM_PROMPT
         return p.read_text(encoding="utf-8")
+
+    def _trim_messages(self) -> list[dict[str, Any]]:
+        """Return messages capped to system prompt + last max_history_messages."""
+        if len(self.messages) <= self.max_history_messages + 1:
+            return self.messages
+        return [self.messages[0]] + self.messages[-self.max_history_messages:]
 
     # -------------------------------------------------------------------
 
@@ -86,7 +96,7 @@ class ReActAgent:
                 self.console.rule(f"[dim]step {step}/{self.max_iterations}[/dim]")
 
             response = await self.provider.chat(
-                messages=self.messages,
+                messages=self._trim_messages(),
                 tools=tools,
                 temperature=self.temperature,
             )

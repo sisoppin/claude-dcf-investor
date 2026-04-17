@@ -14,6 +14,8 @@ from __future__ import annotations
 from copy import copy
 from typing import Any
 
+import re
+
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
@@ -21,7 +23,6 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from .styles import (
     align_center, align_indent, align_left, align_right,
-    border_box, border_top, border_top_thick,
     fill_darkred, fill_darkred_light, fill_header, fill_section,
     fill_teal, fill_teal_light, fill_yellow,
     FMT_INT, FMT_MULT, FMT_NUM, FMT_NUM1, FMT_PCT, FMT_PCT2, FMT_PRICE,
@@ -33,7 +34,6 @@ from .styles import (
 
 def _abs(sheet: str, cell: str) -> str:
     """Cross-sheet absolute reference: 'Sheet'!$B$5"""
-    import re
     m = re.match(r"([A-Z]+)(\d+)$", cell)
     if not m:
         return f"'{sheet}'!{cell}"
@@ -1455,8 +1455,7 @@ class DCFBuilder:
             fmt: str | None = None, is_text: bool = False,
             highlight: bool = False, source: str = "") -> str:
         self._cell(ws, row, 1, label, font=font_black, align=align_indent)
-        font = font_blue if not is_text else font_blue
-        cell = self._cell(ws, row, 2, value, font=font, fmt=fmt,
+        cell = self._cell(ws, row, 2, value, font=font_blue, fmt=fmt,
                           align=align_right if not is_text else align_left)
         if highlight:
             ws[cell].fill = fill_yellow

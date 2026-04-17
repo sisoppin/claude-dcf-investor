@@ -19,7 +19,6 @@ proxied through.
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 from typing import Any
@@ -325,14 +324,6 @@ def get_peer_multiples(tickers: list[str]) -> str:
 # =====================================================================
 # Macro inputs
 # =====================================================================
-_TREASURY_TICKERS = {
-    # country -> Yahoo symbol for 10y govt bond yield
-    "US":     "^TNX",        # CBOE 10y Treasury Note Yield (in pct, ÷10 for raw)
-    "INDIA":  "INDIAVIX",    # placeholder, see fallback
-    "UK":     "^TNX",        # not perfect; UK gilt not directly on yahoo free
-    "JAPAN":  "^TNX",
-}
-
 _DAMODARAN_ERP = {
     # rough static fallback (Damodaran updates monthly).
     # Always cross-check at https://pages.stern.nyu.edu/~adamodar/
@@ -709,7 +700,14 @@ def get_screener_summary(symbol: str, consolidated: bool = True) -> str:
             if data:
                 result[label] = data
 
-        return json.dumps(result, indent=2, default=str)[:30000]  # cap size
+        serialized = json.dumps(result, indent=2, default=str)
+        if len(serialized) <= 30_000:
+            return serialized
+        # Payload too large — return ratios + header only to stay within context limits
+        summary = {k: v for k, v in result.items()
+                   if k in ("symbol", "url", "name", "key_ratios")}
+        summary["note"] = "Full data truncated — fetch individual sections via search_financials_web."
+        return json.dumps(summary, indent=2, default=str)
     except Exception as e:
         return f"ERROR: {type(e).__name__}: {e}"
 

@@ -112,6 +112,19 @@ def validate_spec(spec: dict[str, Any]) -> list[str]:
     if spec["exit_multiple"].get("type") not in ("EV/Revenue", "EV/EBITDA"):
         errors.append("exit_multiple.type must be 'EV/Revenue' or 'EV/EBITDA'")
 
+    wacc = spec.get("wacc", {})
+    if all(k in wacc for k in ("rf", "beta", "erp")):
+        ke_approx = wacc["rf"] + wacc["beta"] * wacc["erp"]
+        for sc in ("bear", "base", "bull"):
+            if sc not in spec.get("scenarios", {}):
+                continue
+            tgr = spec["scenarios"][sc].get("tgr", 0)
+            if tgr >= ke_approx:
+                errors.append(
+                    f"scenarios.{sc}.tgr ({tgr:.2%}) >= implied Ke ({ke_approx:.2%})"
+                    " — invalid GGM terminal value"
+                )
+
     return errors
 
 

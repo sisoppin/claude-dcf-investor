@@ -34,6 +34,8 @@ class OllamaProvider(LLMProvider):
             kwargs["tool_choice"] = "auto"
 
         response = await self.client.chat.completions.create(**kwargs)
+        if not response.choices:
+            return {"content": "ERROR: empty choices list from provider", "tool_calls": [], "raw": response}
         msg = response.choices[0].message
 
         tool_calls = []

@@ -160,4 +160,4 @@ def fetch_url(url: str, max_chars: int = 8000) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(transport="stdio")

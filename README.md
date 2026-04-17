@@ -1,8 +1,8 @@
 # AI Agent (Online + Offline) with Local MCP Servers
 
 A Python ReAct-style agent that runs against either **Perplexity** (online) or
-**local Ollama** (offline), with two **local MCP servers** for internet search
-and file editing (`json` / `yaml` / `csv` / `xlsx`).
+**local Ollama** (offline), with four **local MCP servers** for internet search,
+file editing, financial data, and DCF modelling.
 
 Everything is configured through a single `.env` file.
 
@@ -17,6 +17,8 @@ Everything is configured through a single `.env` file.
 - **Local MCP servers** — spawned as subprocesses over stdio. No hosting required.
   - `search` — `web_search`, `news_search`, `research`, `fetch_url`
   - `file_editor` — sandboxed read/write/edit for json/yaml/csv/xlsx
+  - `finance` — yfinance quotes, financials, treasury yield, Damodaran ERP, SEC EDGAR
+  - `dcf` — build a multi-sheet DCF valuation xlsx from a structured spec
 - **Pluggable** — add more MCP servers by editing `config/mcp_servers.json`.
 - **Sandboxed file ops** — every file path is resolved inside `WORKSPACE_PATH`.
 
