@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 
 import httpx
 from mcp.server.fastmcp import FastMCP
@@ -20,37 +21,55 @@ SEARCH_PROVIDER = os.getenv("SEARCH_PROVIDER", "duckduckgo").strip().lower()
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "").strip()
 DEFAULT_MAX = int(os.getenv("SEARCH_MAX_RESULTS", "5"))
 
+_DDG_RETRIES = 3
+_DDG_BACKOFF = 2.0  # seconds between retries
+
 
 # ---------- backends -------------------------------------------------------
 
 
 def _ddg(query: str, num_results: int, kind: str = "text") -> list[dict]:
-    """DuckDuckGo via the duckduckgo-search package."""
-    from duckduckgo_search import DDGS
+    """DuckDuckGo via the duckduckgo-search package, with retry on rate limit."""
+    from ddgs import DDGS
+    from ddgs.exceptions import DuckDuckGoSearchException
 
-    results: list[dict] = []
-    with DDGS() as ddgs:
-        if kind == "news":
-            for r in ddgs.news(query, max_results=num_results):
-                results.append(
-                    {
-                        "title": r.get("title", ""),
-                        "url": r.get("url", ""),
-                        "snippet": r.get("body", ""),
-                        "source": r.get("source", ""),
-                        "date": r.get("date", ""),
-                    }
-                )
-        else:
-            for r in ddgs.text(query, max_results=num_results):
-                results.append(
-                    {
-                        "title": r.get("title", ""),
-                        "url": r.get("href", ""),
-                        "snippet": r.get("body", ""),
-                    }
-                )
-    return results
+    last_error: Exception | None = None
+    for attempt in range(_DDG_RETRIES):
+        if attempt > 0:
+            time.sleep(_DDG_BACKOFF * attempt)
+        try:
+            results: list[dict] = []
+            with DDGS() as ddgs:
+                if kind == "news":
+                    for r in ddgs.news(query, max_results=num_results):
+                        results.append(
+                            {
+                                "title": r.get("title", ""),
+                                "url": r.get("url", ""),
+                                "snippet": r.get("body", ""),
+                                "source": r.get("source", ""),
+                                "date": r.get("date", ""),
+                            }
+                        )
+                else:
+                    for r in ddgs.text(query, max_results=num_results):
+                        results.append(
+                            {
+                                "title": r.get("title", ""),
+                                "url": r.get("href", ""),
+                                "snippet": r.get("body", ""),
+                            }
+                        )
+            return results
+        except DuckDuckGoSearchException as e:
+            last_error = e
+        except Exception as e:  # noqa: BLE001
+            last_error = e
+            break  # non-rate-limit errors won't be fixed by retrying
+
+    raise RuntimeError(
+        f"DuckDuckGo search failed after {_DDG_RETRIES} attempts: {last_error}"
+    )
 
 
 def _tavily(query: str, num_results: int, kind: str = "text") -> list[dict]:
@@ -103,15 +122,21 @@ def _format(results: list[dict]) -> str:
 @mcp.tool()
 def web_search(query: str, num_results: int = DEFAULT_MAX) -> str:
     """Run a general web search and return the top results with snippets."""
-    results = _search(query, num_results, kind="text")
-    return _format(results)
+    try:
+        results = _search(query, num_results, kind="text")
+        return _format(results)
+    except Exception as e:  # noqa: BLE001
+        return f"ERROR: web_search failed — {e}"
 
 
 @mcp.tool()
 def news_search(query: str, num_results: int = DEFAULT_MAX) -> str:
     """Run a news-focused web search and return recent articles with snippets."""
-    results = _search(query, num_results, kind="news")
-    return _format(results)
+    try:
+        results = _search(query, num_results, kind="news")
+        return _format(results)
+    except Exception as e:  # noqa: BLE001
+        return f"ERROR: news_search failed — {e}"
 
 
 @mcp.tool()
@@ -128,8 +153,11 @@ def research(topic: str, num_results: int = DEFAULT_MAX) -> str:
     ]
     sections: list[str] = []
     for label, q in angles:
-        results = _search(q, num_results, kind="text")
-        sections.append(f"=== {label} (query: {q!r}) ===\n{_format(results)}")
+        try:
+            results = _search(q, num_results, kind="text")
+            sections.append(f"=== {label} (query: {q!r}) ===\n{_format(results)}")
+        except Exception as e:  # noqa: BLE001
+            sections.append(f"=== {label} (query: {q!r}) ===\nERROR: {e}")
     return "\n\n".join(sections)
 
 

@@ -394,7 +394,7 @@ def search_financials_web(query: str, num_results: int = 5) -> str:
     (e.g. India 10y G-Sec yield, screener.in summary, recent investor deck).
     """
     try:
-        from duckduckgo_search import DDGS
+        from ddgs import DDGS
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=num_results))
         if not results:
