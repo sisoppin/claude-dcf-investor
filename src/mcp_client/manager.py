@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from contextlib import AsyncExitStack
@@ -36,7 +37,10 @@ class MCPManager:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.exit_stack.aclose()
+        try:
+            await self.exit_stack.aclose()
+        except (asyncio.CancelledError, KeyboardInterrupt, OSError):
+            pass
 
     async def _connect_all(self) -> None:
         if not self.config_path.exists():
