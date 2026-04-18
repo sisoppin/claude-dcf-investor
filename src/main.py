@@ -14,6 +14,32 @@ from src.config import settings
 from src.mcp_client.manager import MCPManager
 from src.providers.factory import build_provider
 
+import re
+
+_VALUATION_RE = re.compile(
+    r"\b(dcf|valuation|value\s|valued|valuing"
+    r"|build\s+(?:a\s+)?(?:dcf|model|report)"
+    r"|create\s+(?:a\s+)?(?:dcf|model|report)"
+    r"|analyze|analyse)\b",
+    re.IGNORECASE,
+)
+# Bare ticker / company-name heuristic: message is short (≤60 chars),
+# no obvious non-valuation verb, and contains what looks like a ticker
+# or a capitalised company name.
+_BARE_TICKER_RE = re.compile(
+    r"^[A-Z][A-Za-z0-9. ]{0,55}$"
+)
+
+
+def _looks_like_valuation(text: str) -> bool:
+    """Heuristic: does the user's message imply a DCF / valuation task?"""
+    if _VALUATION_RE.search(text):
+        return True
+    stripped = text.strip()
+    if _BARE_TICKER_RE.match(stripped) and len(stripped.split()) <= 6:
+        return True
+    return False
+
 
 console = Console()
 
@@ -125,10 +151,35 @@ async def main() -> int:
                 console.print()
                 continue
 
+            # Auto-detect valuation intent and escalate
+            if _looks_like_valuation(user):
+                agent.system_prompt = VALUATION_PROMPT
+                agent.messages[0] = {"role": "system", "content": VALUATION_PROMPT}
+                saved_max = agent.max_iterations
+                agent.max_iterations = max(agent.max_iterations, 30)
+                console.print(
+                    "[dim]valuation intent detected → switched to "
+                    "valuation prompt (max_iterations=" 
+                    f"{agent.max_iterations})[/dim]"
+                )
+            else:
+                saved_max = None
+
             try:
                 await agent.run(user)
             except Exception as e:  # noqa: BLE001
                 console.print(f"[red]agent error:[/red] {e}")
+
+            # Restore defaults after valuation run
+            if saved_max is not None:
+                agent.max_iterations = saved_max
+                agent.system_prompt = ReActAgent._load_system_prompt(
+                    settings.system_prompt_path
+                )
+                agent.messages[0] = {
+                    "role": "system",
+                    "content": agent.system_prompt,
+                }
             console.print()
 
 
