@@ -31,41 +31,43 @@ _DDG_BACKOFF = 2.0  # seconds between retries
 def _ddg(query: str, num_results: int, kind: str = "text") -> list[dict]:
     """DuckDuckGo via the duckduckgo-search package, with retry on rate limit."""
     from ddgs import DDGS
-    from ddgs.exceptions import DuckDuckGoSearchException
+    from ddgs.exceptions import DDGSException, RatelimitException
 
     last_error: Exception | None = None
     for attempt in range(_DDG_RETRIES):
         if attempt > 0:
             time.sleep(_DDG_BACKOFF * attempt)
         try:
-            results: list[dict] = []
-            with DDGS() as ddgs:
-                if kind == "news":
-                    for r in ddgs.news(query, max_results=num_results):
-                        results.append(
-                            {
-                                "title": r.get("title", ""),
-                                "url": r.get("url", ""),
-                                "snippet": r.get("body", ""),
-                                "source": r.get("source", ""),
-                                "date": r.get("date", ""),
-                            }
-                        )
-                else:
-                    for r in ddgs.text(query, max_results=num_results):
-                        results.append(
-                            {
-                                "title": r.get("title", ""),
-                                "url": r.get("href", ""),
-                                "snippet": r.get("body", ""),
-                            }
-                        )
+            ddgs = DDGS()
+            if kind == "news":
+                results = [
+                    {
+                        "title": r.get("title", ""),
+                        "url": r.get("url", ""),
+                        "snippet": r.get("body", ""),
+                        "source": r.get("source", ""),
+                        "date": r.get("date", ""),
+                    }
+                    for r in ddgs.news(query, max_results=num_results)
+                ]
+            else:
+                results = [
+                    {
+                        "title": r.get("title", ""),
+                        "url": r.get("href", ""),
+                        "snippet": r.get("body", ""),
+                    }
+                    for r in ddgs.text(query, max_results=num_results)
+                ]
             return results
-        except DuckDuckGoSearchException as e:
+        except RatelimitException as e:
             last_error = e
+        except DDGSException as e:
+            last_error = e
+            break
         except Exception as e:  # noqa: BLE001
             last_error = e
-            break  # non-rate-limit errors won't be fixed by retrying
+            break
 
     raise RuntimeError(
         f"DuckDuckGo search failed after {_DDG_RETRIES} attempts: {last_error}"

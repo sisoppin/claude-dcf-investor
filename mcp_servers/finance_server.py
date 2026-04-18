@@ -395,8 +395,8 @@ def search_financials_web(query: str, num_results: int = 5) -> str:
     """
     try:
         from ddgs import DDGS
-        with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=num_results))
+        ddgs = DDGS()
+        results = list(ddgs.text(query, max_results=num_results))
         if not results:
             return f"No results for: {query}"
         out = [f"Search: {query}\n"]
